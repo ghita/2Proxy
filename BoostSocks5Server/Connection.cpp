@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include "connection.h"
 #include "SocksConnection.h"
+#include "HttpConnection.h"
 
 typedef enum _SocksVersion
 {
@@ -20,6 +21,8 @@ SocksVersion ReadSocksVersion(ba::ip::tcp::socket& socket, boost::array<char, 10
         version = version4;
     else if (buffer[0] == 5)
         version = version5;
+	else
+		version = (SocksVersion) buffer[0];
 
     return version;
 }
@@ -35,7 +38,7 @@ void Connection::Start()
 {
     boost::array<char, 1024> buffer;
 
-    SocksVersion socksVer = ReadSocksVersion(*bsocket_, buffer);  
+    SocksVersion socksVer = ReadSocksVersion(*bsocket_, buffer);
 
     if (socksVer == version5)
     {
@@ -50,7 +53,9 @@ void Connection::Start()
     }
     else // asume we have http
     {
-        //
+		char firstByte = socksVer;
+		HttpConnection::Pointer httpConnection = HttpConnection::Create(ioService_, bsocket_, firstByte);
+		httpConnection->Start();
     }
 }
 

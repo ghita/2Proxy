@@ -200,6 +200,7 @@ void ProxySocksSession::HandleRemoteProxyWrite(const boost::system::error_code& 
 	{
 		std::cerr << "Write to remote socket failed: " << error.message() << std::endl;
 		remoteSock_->close();
+		socket_->close();
 	}
 }
 
@@ -210,5 +211,6 @@ void ProxySocksSession::HandleClientProxyWrite(const boost::system::error_code& 
 	{
 		std::cerr << "Write to client socket failed: " << error.message() << std::endl;
 		socket_->close();
+		remoteSock_->close();
 	}
 }

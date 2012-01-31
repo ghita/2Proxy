@@ -49,12 +49,12 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>c:\Program Files (x86)\boost\boost_1_47\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>c:\Program Files\boost\boost_1_47\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>c:\Program Files (x86)\boost\boost_1_47\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>c:\Program Files\boost\boost_1_47\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -80,6 +80,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Connection.h" />
+    <ClInclude Include="HttpConnection.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="socks4.h" />
     <ClInclude Include="socks5.h" />
@@ -90,6 +91,7 @@
   <ItemGroup>
     <ClCompile Include="BoostSocks5Server.cpp" />
     <ClCompile Include="Connection.cpp" />
+    <ClCompile Include="HttpConnection.cpp" />
     <ClCompile Include="server.cpp" />
     <ClCompile Include="SocksConnection.cpp" />
     <ClCompile Include="stdafx.cpp">
