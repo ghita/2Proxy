@@ -27,7 +27,7 @@ SocksVersion ReadSocksVersion(ba::ip::tcp::socket& socket, boost::array<char, 10
     return version;
 }
 
-Connection::Connection(ba::io_service& ioService): ioService_(ioService), bsocket_(new ba::ip::tcp::socket(ioService)) {}
+Connection::Connection(ba::io_service& ioService): ioService_(ioService), bsocket_(ioService) {}
 
 // We handle here both http and socks proxy requests.
 // If case of socks protocol the first byte sent by the client represents the
@@ -38,24 +38,46 @@ void Connection::Start()
 {
     boost::array<char, 1024> buffer;
 
-    SocksVersion socksVer = ReadSocksVersion(*bsocket_, buffer);
+    try 
+    {
+        SocksVersion socksVer = ReadSocksVersion(bsocket_, buffer);
 
-    if (socksVer == version5)
-    {
-        SocksConnection socksConnection(bsocket_, ioService_, buffer);
-        if (socksConnection.HandleHandshake())
-            socksConnection.HandleRequest();
+        //SocksConnection* socksConnection = nullptr;
+        if (socksVer == version5)
+        {
+            //SocksConnection socksConnection(bsocket_, ioService_, buffer);
+            //if (socksConnection.HandleHandshake())
+            //    socksConnection.HandleRequest();
+
+            socksConnection_.reset(new SocksConnection(bsocket_, ioService_, buffer, *this));
+            if (socksConnection_->HandleHandshake())
+            {
+                if (!socksConnection_->HandleRequest())
+                    Shutdown();
+            }
+            else
+            {
+                Shutdown();
+            }
+        }
+        else if (socksVer == version4)
+        {
+            //HandleSocks4Request(sock, buffer);
+            return;
+        }
+        else // asume we have http
+        {
+		    char firstByte = socksVer;
+		    //HttpConnection::Pointer httpConnection = HttpConnection::Create(ioService_, bsocket_, firstByte);
+		    //httpConnection->Start();
+        }
     }
-    else if (socksVer == version4)
+    catch (std::exception& exp)
     {
-        //HandleSocks4Request(sock, buffer);
-        return;
-    }
-    else // asume we have http
-    {
-		char firstByte = socksVer;
-		HttpConnection::Pointer httpConnection = HttpConnection::Create(ioService_, bsocket_, firstByte);
-		httpConnection->Start();
+        //if (socksConnection != nullptr)
+        //    delete 
+        std::cout << "Exception occured while handling new connection, shutting down connection: " << exp.what() << std::endl;
+        Shutdown();
     }
 }
 

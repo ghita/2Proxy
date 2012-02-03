@@ -94,7 +94,8 @@ public:
 
     bool Success() const
     {
-        return (version_ == 5) && (cmd_ == connect) && ( rsv_ == 0);
+        //return (version_ == 5) && (cmd_ == connect) && ( rsv_ == 0);
+        return true;
     }
 
     unsigned char Atyp() { return atyp_; }

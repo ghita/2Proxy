@@ -55,6 +55,7 @@ private:
 	std::string fServer;
 	std::string fPort;
 	bool isOpened;
+    bool isFirstByteAdded;
 
 	std::string fReq;
 	

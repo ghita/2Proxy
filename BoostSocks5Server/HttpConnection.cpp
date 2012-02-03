@@ -1,19 +1,18 @@
 #include "stdafx.h"
 #include "HttpConnection.h"
-//#include <boost/smart_ptr/enable_shared_from_this.hpp>
 
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
 HttpConnection::HttpConnection(ba::io_service& io_service, socket_ptr bsocket, char firstByte) : io_service_(io_service),
-													 /*bsocket_(io_service),*/
 													 bsocket_(bsocket),
 													 ssocket_(io_service),
 													 firstByte_(firstByte),
 													 resolver_(io_service),
 													 proxy_closed(false),
 													 isPersistent(false),
-													 isOpened(false) {
+													 isOpened(false),
+                                                     isFirstByteAdded(false) {
 }
 
 /** 
@@ -41,7 +40,15 @@ void HttpConnection::Start() {
 void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t len) {
 	if(!err) {
 		if(fHeaders.empty())
-			fHeaders= firstByte_ + std::string(bbuffer.data(),len);
+        {
+            if ((firstByte_ != 0) && (!isFirstByteAdded))
+            {
+                fHeaders= firstByte_ + std::string(bbuffer.data(),len);
+                isFirstByteAdded = true;
+            }
+            else
+                fHeaders= std::string(bbuffer.data(),len);
+        }
 		else
 			fHeaders+=std::string(bbuffer.data(),len);
 		if(fHeaders.find("\r\n\r\n") == std::string::npos) { // going to read rest of headers
@@ -317,16 +324,30 @@ void HttpConnection::ParseHeaders(const std::string& h, HeadersMap& hm) {
 	std::string str(h);
 	std::string::size_type idx;
 	std::string t;
+    bool badHeaderFormat = false;
+
 	while((idx=str.find("\r\n")) != std::string::npos) {
+        badHeaderFormat = false;
 		t=str.substr(0,idx);
 		str.erase(0,idx+2);
 		if(t == "")
 			break;
 		idx=t.find(": ");
 		if(idx == std::string::npos) {
-			std::cout << "Bad header line: " << t << std::endl;
-			break;
+			std::cout << "Bad header line, trying with other format now: " << t << std::endl;
+			//break;
+            badHeaderFormat = true;
+            idx=t.find(":");
+            if (idx == std::string::npos)
+            {
+                std::cout << "Bad header line, giving up now: " << t << std::endl;
+                break;
+            }
 		}
-		hm.insert(std::make_pair(t.substr(0,idx),t.substr(idx+2)));
+
+        if (!badHeaderFormat)
+		    hm.insert(std::make_pair(t.substr(0,idx),t.substr(idx+2)));
+        else
+            hm.insert(std::make_pair(t.substr(0,idx),t.substr(idx+1)));
 	}
 }
