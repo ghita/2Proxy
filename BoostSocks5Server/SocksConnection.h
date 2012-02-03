@@ -55,6 +55,8 @@ private:
 	void HandleRemoteProxyWrite(const boost::system::error_code& error);
 	void HandleClientProxyWrite(const boost::system::error_code& error);
 
+	void Shutdown();
+
 private:
 	//socket_ptr socket_;
     ba::ip::tcp::socket& socket_;
@@ -62,6 +64,8 @@ private:
     ba::ip::tcp::socket& remoteSock_;
     SocksConnection& parentConnection_;
     //ba::ip::tcp::socket& remoteSock_;
+
+	bool shutdownInProgress_;
 
   enum { max_length = 10000 };
   char dataClient_[max_length];

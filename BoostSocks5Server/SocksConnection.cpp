@@ -196,7 +196,7 @@ void SocksConnection::HandleResolve(const boost::system::error_code& err,
 }
 
 ProxySocksSession::ProxySocksSession(ba::io_service& ioService, ba::ip::tcp::socket&  socket, ba::ip::tcp::socket&  remoteSock, SocksConnection& parrentConn): 
-    ioService_(ioService), socket_(socket), remoteSock_(remoteSock), parentConnection_(parrentConn)
+    ioService_(ioService), socket_(socket), remoteSock_(remoteSock), parentConnection_(parrentConn), shutdownInProgress_(false)
 {
 
 }
@@ -205,12 +205,12 @@ void ProxySocksSession::Start()
 {
 //std::cout << "\tProxySocksSession::Start" << std::endl;	
 	socket_.async_read_some(boost::asio::buffer(dataClient_, 1024),
-        boost::bind(&ProxySocksSession::HandleClientProxyRead, this,
+		boost::bind(&ProxySocksSession::HandleClientProxyRead, shared_from_this(),
          boost::asio::placeholders::error,
          boost::asio::placeholders::bytes_transferred));
 
 	remoteSock_.async_read_some(boost::asio::buffer(dataRemote_, 1024),
-        boost::bind(&ProxySocksSession::HandleRemoteProxyRead, this,
+        boost::bind(&ProxySocksSession::HandleRemoteProxyRead, shared_from_this(),
          boost::asio::placeholders::error,
          boost::asio::placeholders::bytes_transferred));
 }
@@ -219,7 +219,7 @@ void ProxySocksSession::Start()
 void ProxySocksSession::HandleClientProxyRead(const boost::system::error_code& error,
       size_t bytes_transferred)
 {
-	if (!error)
+	if (!error && !this->shutdownInProgress_)
     {
 		//std::cout << "Received from client: \r\n" << std::string(dataClient_, bytes_transferred) << "\r\n\r\n";
         
@@ -230,20 +230,20 @@ void ProxySocksSession::HandleClientProxyRead(const boost::system::error_code& e
 		if (bytes_transferred > 0)
 		  boost::asio::async_write(remoteSock_,
 			  boost::asio::buffer(dataClientCopy_, bytes_transferred),
-			  boost::bind(&ProxySocksSession::HandleRemoteProxyWrite, this,
+			  boost::bind(&ProxySocksSession::HandleRemoteProxyWrite, shared_from_this(),
 				boost::asio::placeholders::error));
 
 		// read some more data from socks client
 		socket_.async_read_some(boost::asio::buffer(dataClient_, 1024),
-			boost::bind(&ProxySocksSession::HandleClientProxyRead, this,
+			boost::bind(&ProxySocksSession::HandleClientProxyRead, shared_from_this(),
 				boost::asio::placeholders::error,
 				boost::asio::placeholders::bytes_transferred));
     }
 	else
 	{
-        //socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-        //socket_.close();
-        parentConnection_.Shutdown();
+		if (bytes_transferred > 0)
+			std::cout << "Shuting down with some bytes read!!!!!!!!!!!! \r\n" <<   dataClient_ << std::endl << std::endl << std::endl;
+		Shutdown();
 	}
 }
 
@@ -251,7 +251,7 @@ void ProxySocksSession::HandleClientProxyRead(const boost::system::error_code& e
 void ProxySocksSession::HandleRemoteProxyRead(const boost::system::error_code& error,
       size_t bytes_transferred)
 {
-	if (!error)
+	if (!error && !this->shutdownInProgress_)
     {
 		//std::cout << "Received from remote end: \r\n" << std::string(dataRemote_, bytes_transferred) << "\r\n\r\n";
         //std::cout << "Start relaying data to socks client" << std::endl;
@@ -262,20 +262,20 @@ void ProxySocksSession::HandleRemoteProxyRead(const boost::system::error_code& e
 		if (bytes_transferred > 0)
 		boost::asio::async_write(socket_,
           boost::asio::buffer(dataRemote_, bytes_transferred),
-          boost::bind(&ProxySocksSession::HandleClientProxyWrite, this,
+          boost::bind(&ProxySocksSession::HandleClientProxyWrite, shared_from_this(),
             boost::asio::placeholders::error));
 
 		//read some more data from remote endpoint
 		remoteSock_.async_read_some(boost::asio::buffer(dataRemote_, 1024),
-			boost::bind(&ProxySocksSession::HandleRemoteProxyRead, this,
+			boost::bind(&ProxySocksSession::HandleRemoteProxyRead, shared_from_this(),
 			 boost::asio::placeholders::error,
 			 boost::asio::placeholders::bytes_transferred));
     }
 	else
 	{
-        //remoteSock_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-        //remoteSock_.close();
-        parentConnection_.Shutdown();
+		if (bytes_transferred > 0)
+			std::cout << "Shuting down with some bytes read!!!!!!!!!!!! \r\n" <<  dataRemote_ << std::endl << std::endl << std::endl;
+        Shutdown();
 	}
 }
 
@@ -285,15 +285,6 @@ void ProxySocksSession::HandleRemoteProxyWrite(const boost::system::error_code& 
 	if (error)
 	{
 		std::cerr << "Write to remote socket failed: " << error.message() << std::endl;
-		//remoteSock_->close();
-		//socket_->close();
-        //delete this;
-
-        //remoteSock_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-        remoteSock_.close();
-        //socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-        socket_.close();
-        parentConnection_.Shutdown();
         //if (error != boost::asio::error::eof)
 	}
 }
@@ -304,12 +295,20 @@ void ProxySocksSession::HandleClientProxyWrite(const boost::system::error_code& 
 	if (error)
 	{
 		std::cerr << "Write to client socket failed: " << error.message() << std::endl;
-        //remoteSock_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-        remoteSock_.close();
-        //socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-        socket_.close();
-        parentConnection_.Shutdown();
 	}
 
     //std::cout << "HandleClientProxyWrite - data was sent to client proxy" << std::endl;
+}
+
+
+void ProxySocksSession::Shutdown()
+{
+	if (!shutdownInProgress_)
+	{
+		std::cout << "Shuting down ..." << std::endl;
+		shutdownInProgress_ = true;
+		//remoteSock_.close();
+		//socket_.close();
+		parentConnection_.Shutdown();
+	}
 }
