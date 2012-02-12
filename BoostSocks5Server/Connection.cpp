@@ -27,7 +27,7 @@ SocksVersion ReadSocksVersion(ba::ip::tcp::socket& socket, boost::array<char, 10
     return version;
 }
 
-Connection::Connection(ba::io_service& ioService): ioService_(ioService), bsocket_(ioService) {}
+Connection::Connection(ba::io_service& ioService): ioService_(ioService), bsocket_(ioService), httpConnection_() {}
 
 // We handle here both http and socks proxy requests.
 // If case of socks protocol the first byte sent by the client represents the
@@ -40,15 +40,12 @@ void Connection::Start()
 
     try 
     {
-        SocksVersion socksVer = ReadSocksVersion(bsocket_, buffer);
+		SocksVersion socksVer = versionUnknown;
+        //SocksVersion socksVer = ReadSocksVersion(bsocket_, buffer);
 
         //SocksConnection* socksConnection = nullptr;
         if (socksVer == version5)
         {
-            //SocksConnection socksConnection(bsocket_, ioService_, buffer);
-            //if (socksConnection.HandleHandshake())
-            //    socksConnection.HandleRequest();
-
             socksConnection_.reset(new SocksConnection(bsocket_, ioService_, buffer, *this));
             if (socksConnection_->HandleHandshake())
             {
@@ -67,9 +64,9 @@ void Connection::Start()
         }
         else // asume we have http
         {
-		    char firstByte = socksVer;
-		    //HttpConnection::Pointer httpConnection = HttpConnection::Create(ioService_, bsocket_, firstByte);
-		    //httpConnection->Start();
+		    char firstByte = 0;
+			httpConnection_ = HttpConnection::Create(ioService_, bsocket_, firstByte);
+			httpConnection_->Start();
         }
     }
     catch (std::exception& exp)

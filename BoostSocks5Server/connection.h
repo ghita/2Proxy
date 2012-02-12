@@ -4,6 +4,8 @@
 //FWD
 #include "SocksConnection.h"
 
+class HttpConnection;
+
 class Connection : public boost::enable_shared_from_this<Connection> {
 public:
 	//typedef boost::shared_ptr<Connection> Pointer;
@@ -36,4 +38,5 @@ private:
     //socket_ptr bsocket_;
     ba::ip::tcp::socket bsocket_;
     std::unique_ptr<SocksConnection> socksConnection_;
+	boost::shared_ptr<HttpConnection> httpConnection_;
 };

@@ -142,7 +142,7 @@ class SOCK5Response
 {
 public:
 	SOCK5Response(bool succeded = true) : version(5), cmd(succeded ? RESP_SUCCEDED : RESP_GEN_ERROR),
-		rsv(0), atyp(SOCKS5RequestHeader::addressingType::atyp_ipv4) {}
+		rsv(0), atyp(SOCKS5RequestHeader::atyp_ipv4) {}
 
     boost::array<boost::asio::mutable_buffer, 6> buffers()
     {

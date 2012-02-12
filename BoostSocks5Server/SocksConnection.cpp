@@ -57,7 +57,7 @@ bool SocksConnection::HandleRequest()
     remoteSocket_.reset(new ba::ip::tcp::socket(ioService_));
 	switch(header.Atyp())
 	{
-		case SOCKS5RequestHeader::addressingType::atyp_ipv4:
+		case SOCKS5RequestHeader::atyp_ipv4:
 			{
 					SOCK5IP4RequestBody req;
 					ba::read(csocket_, req.buffers()); // if length is not OK does booost ASIO throw ?
@@ -82,7 +82,7 @@ bool SocksConnection::HandleRequest()
 				break;
 			}
  
-		case SOCKS5RequestHeader::addressingType::atyp_dname:
+		case SOCKS5RequestHeader::atyp_dname:
             {
                 // the format for request body is following: xFQDNAddress|Port
                 // where x represents nb. of bytes from FQDNAddress
@@ -232,17 +232,16 @@ void ProxySocksSession::HandleClientProxyRead(const boost::system::error_code& e
 			  boost::asio::buffer(dataClientCopy_, bytes_transferred),
 			  boost::bind(&ProxySocksSession::HandleRemoteProxyWrite, shared_from_this(),
 				boost::asio::placeholders::error));
-
+#if 0
 		// read some more data from socks client
 		socket_.async_read_some(boost::asio::buffer(dataClient_, 1024),
 			boost::bind(&ProxySocksSession::HandleClientProxyRead, shared_from_this(),
 				boost::asio::placeholders::error,
 				boost::asio::placeholders::bytes_transferred));
+#endif
     }
 	else
 	{
-		if (bytes_transferred > 0)
-			std::cout << "Shuting down with some bytes read!!!!!!!!!!!! \r\n" <<   dataClient_ << std::endl << std::endl << std::endl;
 		Shutdown();
 	}
 }
@@ -265,16 +264,16 @@ void ProxySocksSession::HandleRemoteProxyRead(const boost::system::error_code& e
           boost::bind(&ProxySocksSession::HandleClientProxyWrite, shared_from_this(),
             boost::asio::placeholders::error));
 
+#if 0
 		//read some more data from remote endpoint
 		remoteSock_.async_read_some(boost::asio::buffer(dataRemote_, 1024),
 			boost::bind(&ProxySocksSession::HandleRemoteProxyRead, shared_from_this(),
 			 boost::asio::placeholders::error,
 			 boost::asio::placeholders::bytes_transferred));
+#endif
     }
 	else
 	{
-		if (bytes_transferred > 0)
-			std::cout << "Shuting down with some bytes read!!!!!!!!!!!! \r\n" <<  dataRemote_ << std::endl << std::endl << std::endl;
         Shutdown();
 	}
 }
@@ -282,19 +281,37 @@ void ProxySocksSession::HandleRemoteProxyRead(const boost::system::error_code& e
 // completion event for remote endpoint write
 void ProxySocksSession::HandleRemoteProxyWrite(const boost::system::error_code& error)
 {
-	if (error)
+	if (error || this->shutdownInProgress_)
 	{
 		std::cerr << "Write to remote socket failed: " << error.message() << std::endl;
         //if (error != boost::asio::error::eof)
+		Shutdown();
+	}
+	else
+	{
+		// read some more data from socks client
+		socket_.async_read_some(boost::asio::buffer(dataClient_, 1024),
+			boost::bind(&ProxySocksSession::HandleClientProxyRead, shared_from_this(),
+				boost::asio::placeholders::error,
+				boost::asio::placeholders::bytes_transferred));
 	}
 }
 
 // completion event for client write
 void ProxySocksSession::HandleClientProxyWrite(const boost::system::error_code& error)
 {
-	if (error)
+	if (error || this->shutdownInProgress_)
 	{
 		std::cerr << "Write to client socket failed: " << error.message() << std::endl;
+		Shutdown();
+	}
+	else
+	{
+		//read some more data from remote endpoint
+		remoteSock_.async_read_some(boost::asio::buffer(dataRemote_, 1024),
+			boost::bind(&ProxySocksSession::HandleRemoteProxyRead, shared_from_this(),
+			 boost::asio::placeholders::error,
+			 boost::asio::placeholders::bytes_transferred));
 	}
 
     //std::cout << "HandleClientProxyWrite - data was sent to client proxy" << std::endl;
@@ -307,8 +324,8 @@ void ProxySocksSession::Shutdown()
 	{
 		std::cout << "Shuting down ..." << std::endl;
 		shutdownInProgress_ = true;
-		//remoteSock_.close();
-		//socket_.close();
+		//remoteSock_.close(); -- no need as it is closed automatically as part of parentConnection_ shutdown/deletion
+		//socket_.close(); -- no need as it is closed automatically as part of parentConnection_ shutdown/deletion
 		parentConnection_.Shutdown();
 	}
 }
