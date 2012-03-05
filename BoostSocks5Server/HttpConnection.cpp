@@ -4,6 +4,8 @@
 #include <boost/regex.hpp>
 #include <boost/lexical_cast.hpp>
 
+#include "HttpUtil.h"
+
 HttpConnection::HttpConnection(ba::io_service& io_service, ba::ip::tcp::socket& bsocket, char firstByte) : io_service_(io_service),
 													 bsocket_(bsocket),
 													 ssocket_(io_service),
@@ -110,7 +112,7 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 			case Method:
 				resultRange = parser_.ParseUntil(network::RequestParser::MethodDone, 
 					std::make_pair(newStart_, dataEnd_), parseResult);
-				if (parseResult == network::RequestParser::ParsedFailed)
+ 				if (parseResult == network::RequestParser::ParsedFailed)
 				{
 					std::cout << "Error processing Method" << std::endl;
 					break;
@@ -234,6 +236,8 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 					//TODO: we don't parse for now the headers and fill out our BasicMessage instance with it
 
 					std::cout << "\t Headers = " << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
+					this->reqHeaders_ = this->partialParsed_;
+					StartConnect();
 
 					//this->newStart_ = resultRange.second; // from here continue parsing with other data that exists in browser buffer
 					//TODO: we've read all headers, it's possible that client sends also body data ??
@@ -407,26 +411,16 @@ void HttpConnection::Shutdown() {
  * 
  */
 void HttpConnection::StartConnect() {
-	std::string server="";
-	std::string port="80";
-	boost::regex rHTTP("http://(.*?)(:(\\d+))?(/.*)");
-	boost::smatch m;
-	
-	if(boost::regex_search(fURL, m, rHTTP, boost::match_extra)) {
-		server=m[1].str();
-		if(m[2].str() != "") {
-			port=m[3].str();
-		}
-		fNewURL=m[4].str();
-	}
-	if(server.empty()) {
-		std::cout << "Can't parse URL "<< std::endl;
-		return;
-	}
-	if(!isOpened || server != fServer || port != fPort) {
-		fServer=server;
+	std::string uri(this->message_.Destination().begin(), this->message_.Destination().end());
+	std::string host;
+	std::string port;
+
+	ParseUri(uri, host, port);
+
+	if(!isOpened /*|| server != fServer || port != fPort*/) {
+		fServer=host;
 		fPort=port;
-		ba::ip::tcp::resolver::query query(server, port);
+		ba::ip::tcp::resolver::query query(host, port);
 		resolver_.async_resolve(query,
 								boost::bind(&HttpConnection::HandleResolve, shared_from_this(),
 											boost::asio::placeholders::error,
@@ -441,13 +435,14 @@ void HttpConnection::StartConnect() {
  * 
  */
 void HttpConnection::StartWriteToServer() {
-	fReq=fMethod;
+	fReq=std::string(this->message_.Method().begin(), this->message_.Method().end());
 	fReq+=" ";
-	fReq+=fNewURL;
+	fReq+=std::string(this->message_.Destination().begin(), this->message_.Destination().end());
 	fReq+=" HTTP/";
 	fReq+="1.0";
 	fReq+="\r\n";
-	fReq+=fHeaders;
+
+	fReq += std::string(this->reqHeaders_.begin(), this->reqHeaders_.end()) ;
 	ba::async_write(ssocket_, ba::buffer(fReq),
 					boost::bind(&HttpConnection::HandleServerWrite, shared_from_this(),
 								ba::placeholders::error,

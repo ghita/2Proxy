@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="HttpProtocol">
+      <UniqueIdentifier>{879837c1-3934-4761-a2b2-f4d4c7f21421}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
@@ -47,6 +50,15 @@
     </ClInclude>
     <ClInclude Include="stringUtil.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpProtocol\message.h">
+      <Filter>HttpProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpProtocol\RequestParser.h">
+      <Filter>HttpProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpUtil.h">
+      <Filter>HttpProtocol</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

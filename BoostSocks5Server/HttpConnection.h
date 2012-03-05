@@ -57,7 +57,6 @@ private:
 	int32_t RespLen;
 	int32_t RespReaded;
 
-	std::string fURL;
 	std::string fHeaders;
 	std::string fNewURL;
 	std::string fMethod;
@@ -68,16 +67,20 @@ private:
     bool isFirstByteAdded;
 
 	std::string fReq;
+
+	typedef boost::array<char, 1024uL> BufferType;
+	typedef std::vector<char> DataType;
 	
+	//TODO: keep only one version of headers
 	typedef std::map<std::string,std::string> HeadersMap;
+
+
 	HeadersMap reqHeaders, respHeaders;
+	DataType reqHeaders_;
+
 	
 	void ParseHeaders(const std::string& h, HeadersMap& hm);
 
-	typedef boost::array<char, 3uL> BufferType;
-	typedef std::vector<char> DataType;
-
-	
 	BufferType bbuffer;
 	BufferType sbuffer;
 	DataType partialParsed_;
