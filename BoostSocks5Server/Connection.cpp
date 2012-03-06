@@ -74,6 +74,7 @@ void Connection::Start()
         //if (socksConnection != nullptr)
         //    delete 
         std::cout << "Exception occured while handling new connection, shutting down connection: " << exp.what() << std::endl;
+        FILE_LOG(logERROR) << "Exception occured while handling new connection, shutting down connection: " << exp.what(); 
         Shutdown();
     }
 }

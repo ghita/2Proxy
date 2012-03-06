@@ -114,7 +114,8 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 					std::make_pair(newStart_, dataEnd_), parseResult);
  				if (parseResult == network::RequestParser::ParsedFailed)
 				{
-					std::cout << "Error processing Method" << std::endl;
+					//std::cout << "Error processing Method" << std::endl;
+                    FILE_LOG(logERROR) << "Error processing Method";
 					break;
 				}
 				else if (parseResult == network::RequestParser::ParsedOK) // read all Method data succefully
@@ -122,7 +123,8 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 					std::copy(resultRange.first, resultRange.second, std::back_inserter(partialParsed_)); //append to partial result
 					this->message_.Method(this->partialParsed_);
 
-					std::cout << "\t Method = " << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
+					//std::cout << "\t Method = " << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
+                    FILE_LOG(logINFO) << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend());
 
 					//TODO: trim method
 					this->newStart_ = resultRange.second; // from here continue parsing with other data that exists in browser buffer
@@ -152,14 +154,15 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 
 				if (parseResult == network::RequestParser::ParsedFailed)
 				{
-					std::cout << "Error processing Uri" << std::endl;
+					FILE_LOG(logERROR) << "Error processing Uri";
 					break;
 				}
 				else if (parseResult == network::RequestParser::ParsedOK) // read all Uri data succefully
 				{
 					std::copy(resultRange.first, resultRange.second, std::back_inserter(partialParsed_)); //append to partial result
 
-					std::cout << "\t Uri = " << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
+					//std::cout << "\t Uri = " << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
+                    FILE_LOG(logINFO) << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
 
 					this->message_.Destination(this->partialParsed_);
 					//TODO: trim destination
@@ -190,14 +193,16 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 
 				if (parseResult == network::RequestParser::ParsedFailed)
 				{
-					std::cout << "Error processing Http Version" << std::endl;
+					//std::cout << "Error processing Http Version" << std::endl;
+                    FILE_LOG(logERROR) << "Error processing Http Version";
 					break;
 				}
 				else if (parseResult == network::RequestParser::ParsedOK) // read all Uri data succefully
 				{
 					std::copy(resultRange.first, resultRange.second, std::back_inserter(partialParsed_)); //append to partial result
 
-					std::cout << "\t Version = " << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
+					//std::cout << "\t Version = " << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
+                    FILE_LOG(logINFO) << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend());
 
 					// we don't have yet version information in BasicMessage class, skip this info for now
 					this->newStart_ = resultRange.second; // from here continue parsing with other data that exists in browser buffer
@@ -227,7 +232,8 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 
 				if (parseResult == network::RequestParser::ParsedFailed)
 				{
-					std::cout << "Error processing Http Headers" << std::endl;
+					//std::cout << "Error processing Http Headers" << std::endl;
+                    FILE_LOG(logERROR) <<  "Error processing Http Headers";
 					break;
 				}
 				else if (parseResult == network::RequestParser::ParsedOK) // read all Uri data succefully
@@ -236,6 +242,7 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 					//TODO: we don't parse for now the headers and fill out our BasicMessage instance with it
 
 					std::cout << "\t Headers = " << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend()) << std::endl;
+                    FILE_LOG(logINFO) << std::string(this->partialParsed_.cbegin(), this->partialParsed_.cend());
 					this->reqHeaders_ = this->partialParsed_;
 					StartConnect();
 
@@ -244,7 +251,8 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 
 					if (resultRange.second < dataEnd_)
 					{
-						std::cout << "\t\tThere is data remaining in browser read buffer:!!!!!! " << std::string(resultRange.second, dataEnd_); 
+						//std::cout << "\t\tThere is data remaining in browser read buffer:!!!!!! " << std::string(resultRange.second, dataEnd_); 
+                        FILE_LOG(logWARNING) << "There is data remaining in browser read buffer";
 					}
 					this->partialParsed_.clear(); // use it only for one element
 				}
@@ -291,6 +299,7 @@ void HttpConnection::HandleServerWrite(const bs::error_code& err, size_t len) {
 							   ba::placeholders::error,
 							   ba::placeholders::bytes_transferred));
 	}else {
+        FILE_LOG(logERROR) << "HttpConnection::HandleServerWrite failed: " << err.message();
 		Shutdown();
 	}
 }
@@ -316,6 +325,8 @@ void HttpConnection::HandleServerReadHeaders(const bs::error_code& err, size_t l
 								   ba::placeholders::error,
 								   ba::placeholders::bytes_transferred));
 		} else { // analyze headers
+            FILE_LOG(logDEBUG) << "HttpConnection::HandleServerReadHeaders: " << fHeaders;
+
 			RespReaded=len-idx-4;
 			idx=fHeaders.find("\r\n");
  			std::string respString=fHeaders.substr(0,idx);
@@ -349,6 +360,7 @@ void HttpConnection::HandleServerReadHeaders(const bs::error_code& err, size_t l
 										ba::placeholders::bytes_transferred));
 		}
 	} else {
+        FILE_LOG(logERROR) << "HttpConnection::HandleServerReadHeaders error: " << err.message();
 		Shutdown();
 	}
 }
@@ -392,7 +404,8 @@ void HttpConnection::HandleBrowserWrite(const bs::error_code& err, size_t len) {
 		else {
 //			shutdown();
  			if(isPersistent && !proxy_closed) {
-  				std::cout << "Starting read headers from browser, as connection is persistent" << std::endl;
+  				//std::cout << "Starting read headers from browser, as connection is persistent" << std::endl;
+                FILE_LOG(logINFO) << "Starting read headers from browser, as connection is persistent";
   				Start();
  			}
 		}
@@ -415,7 +428,9 @@ void HttpConnection::StartConnect() {
 	std::string host;
 	std::string port;
 
-	ParseUri(uri, host, port);
+	if (!ParseUri(uri, host, port))
+        throw std::exception("Invaid URI");
+        //TODO: retun an error to client;
 
 	if(!isOpened /*|| server != fServer || port != fPort*/) {
 		fServer=host;
@@ -442,7 +457,9 @@ void HttpConnection::StartWriteToServer() {
 	fReq+="1.0";
 	fReq+="\r\n";
 
-	fReq += std::string(this->reqHeaders_.begin(), this->reqHeaders_.end()) ;
+	fReq += std::string(this->reqHeaders_.begin(), this->reqHeaders_.end());
+    FILE_LOG(logDEBUG) << "HttpConnection::StartWriteToServer: " << fReq;
+
 	ba::async_write(ssocket_, ba::buffer(fReq),
 					boost::bind(&HttpConnection::HandleServerWrite, shared_from_this(),
 								ba::placeholders::error,
@@ -467,6 +484,7 @@ void HttpConnection::HandleResolve(const boost::system::error_code& err,
 										  boost::asio::placeholders::error,
 										  ++endpoint_iterator));
     }else {
+        FILE_LOG(logERROR) << "HttpConnection::HandleResolve failed: " << err.message();
 		Shutdown();
 	}
 }
@@ -490,6 +508,7 @@ void HttpConnection::HandleConnect(const boost::system::error_code& err,
 										   boost::asio::placeholders::error,
 										   ++endpoint_iterator));
     } else {
+        FILE_LOG(logERROR) << "HttpConnection::HandleConnect failed: " << err.message();
 		Shutdown();
 	}
 }
@@ -508,13 +527,15 @@ void HttpConnection::ParseHeaders(const std::string& h, HeadersMap& hm) {
 			break;
 		idx=t.find(": ");
 		if(idx == std::string::npos) {
-			std::cout << "Bad header line, trying with other format now: " << t << std::endl;
+			//std::cout << "Bad header line, trying with other format now: " << t << std::endl;
+            FILE_LOG(logERROR) << "Bad header line, trying with other format now: ";
 			//break;
             badHeaderFormat = true;
             idx=t.find(":");
             if (idx == std::string::npos)
             {
-                std::cout << "Bad header line, giving up now: " << t << std::endl;
+                //std::cout << "Bad header line, giving up now: " << t << std::endl;
+                FILE_LOG(logERROR) << "Bad header line, giving up now: ";
                 break;
             }
 		}

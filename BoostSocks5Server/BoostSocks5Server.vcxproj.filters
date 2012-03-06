@@ -16,6 +16,9 @@
     <Filter Include="HttpProtocol">
       <UniqueIdentifier>{879837c1-3934-4761-a2b2-f4d4c7f21421}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Log">
+      <UniqueIdentifier>{e16271d7-46b0-4ca9-87a8-3e153a5fbcbe}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
@@ -57,8 +60,14 @@
     <ClInclude Include="HttpProtocol\RequestParser.h">
       <Filter>HttpProtocol</Filter>
     </ClInclude>
-    <ClInclude Include="HttpUtil.h">
+    <ClInclude Include="HttpProtocol\HttpUtil.h">
       <Filter>HttpProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpProtocol\Logger.h">
+      <Filter>Log</Filter>
+    </ClInclude>
+    <ClInclude Include="Log\Log.h">
+      <Filter>Log</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

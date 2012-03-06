@@ -49,12 +49,12 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>c:\Program Files\boost\boost_1_47\;f:\Work\Boost\ASIO\2Proxy\BoostSocks5Server\HttpProtocol\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>c:\Program Files (x86)\boost\boost_1_47\;.\HttpProtocol;.\Log</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>c:\Program Files\boost\boost_1_47\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>c:\Program Files (x86)\boost\boost_1_47\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -65,7 +65,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>c:\Program Files\boost\boost_1_47\;f:\Work\Boost\ASIO\2Proxy\BoostSocks5Server\HttpProtocol\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>c:\Program Files (x86)\boost\boost_1_47\;.\HttpProtocol;.\Log</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -81,9 +81,11 @@
   <ItemGroup>
     <ClInclude Include="Connection.h" />
     <ClInclude Include="HttpConnection.h" />
+    <ClInclude Include="HttpProtocol\HttpUtil.h" />
+    <ClInclude Include="HttpProtocol\Logger.h" />
     <ClInclude Include="HttpProtocol\message.h" />
     <ClInclude Include="HttpProtocol\RequestParser.h" />
-    <ClInclude Include="HttpUtil.h" />
+    <ClInclude Include="Log\Log.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="socks4.h" />
     <ClInclude Include="socks5.h" />

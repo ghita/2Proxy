@@ -23,6 +23,8 @@
 #include <boost/thread.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
+#include "Log.h"
+
 namespace ba=boost::asio;
 namespace bs=boost::system;
 
