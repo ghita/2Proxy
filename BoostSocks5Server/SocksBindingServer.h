@@ -5,7 +5,7 @@ class SocksBindingServer
 {
 public:
  
-	SocksBindingServer(ba::io_service& ioService, unsigned int cAddress, unsigned short cPort, int bindingPort);
+	SocksBindingServer(ba::io_service& ioService, unsigned int cAddress, unsigned short cPort, unsigned short bindingPort);
     void StartAccept();
  
 private:

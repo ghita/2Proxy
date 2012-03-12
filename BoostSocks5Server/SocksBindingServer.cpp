@@ -2,7 +2,7 @@
 #include "SocksBindingServer.h"
  
  
-SocksBindingServer::SocksBindingServer(ba::io_service& ioService, unsigned int cAddress, unsigned short cPort, int bindingPort): 
+SocksBindingServer::SocksBindingServer(ba::io_service& ioService, unsigned int cAddress, unsigned short cPort, unsigned short bindingPort): 
 ioService_(ioService), cAddress_(cAddress), cPort_(cPort), bindingPort_(bindingPort), 
     acceptor_(ioService_, ba::ip::tcp::endpoint(ba::ip::tcp::v4(), bindingPort))
 {
@@ -31,6 +31,7 @@ void SocksBindingServer::HandleAccept(ba::ip::tcp::socket* csocket, const boost:
 		clBindSock->connect(endpoint); //connect throws if connection failed
 
         int written = ba::write(*clBindSock, ba::buffer(data, len));
+		written;
     }
 	else
 	{

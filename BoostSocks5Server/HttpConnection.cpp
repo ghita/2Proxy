@@ -5,7 +5,6 @@
 #include <boost/lexical_cast.hpp>
 
 #include "HttpUtil.h"
-#include "HttpServerResponseConnection.h"
 
 HttpConnection::HttpConnection(ba::io_service& io_service, ba::ip::tcp::socket& bsocket, char firstByte, Connection& parrentConn) : io_service_(io_service),
 													 bsocket_(bsocket),
@@ -17,21 +16,15 @@ HttpConnection::HttpConnection(ba::io_service& io_service, ba::ip::tcp::socket& 
 													 isOpened(false),
                                                      isFirstByteAdded(false),
 													 clientRequestState_(Method),
+													 serverResponseState_(ReadUntilBody),
 													 parrentConn_(parrentConn),
-													 isShuttingDown_(false),
-													 lifeMng_(new HttpConnectionLifeManagement(parrentConn_)) {}
+													 isShuttingDown_(false)
+													 {}
 
-/** 
- * 
- * 
- */
 void HttpConnection::Start() {
 
 	newStart_ = bbuffer.begin();
-	fHeaders.clear();
 	reqHeaders.clear();
-	respHeaders.clear();
-	
 	ba::async_read(bsocket_, ba::buffer(bbuffer), ba::transfer_at_least(1),
 			   boost::bind(&HttpConnection::HandleBrowserReadHeaders,
 			   shared_from_this(),
@@ -39,70 +32,9 @@ void HttpConnection::Start() {
 						   ba::placeholders::bytes_transferred));
 }
 
-/** 
- * 
- * 
- * @param err 
- * @param len 
- */
-void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t len) {
-#if 0
-	if(!err) {
-		if(fHeaders.empty())
-        {
-            if ((firstByte_ != 0) && (!isFirstByteAdded))
-            {
-                fHeaders= firstByte_ + std::string(bbuffer.data(),len);
-                isFirstByteAdded = true;
-            }
-            else
-                fHeaders= std::string(bbuffer.data(),len);
-        }
-		else
-			fHeaders+=std::string(bbuffer.data(),len);
-		if(fHeaders.find("\r\n\r\n") == std::string::npos) { // going to read rest of headers
-			ba::async_read(bsocket_, ba::buffer(bbuffer), ba::transfer_at_least(1),
-					   boost::bind(&HttpConnection::HandleBrowserReadHeaders,
-								   shared_from_this(),
-								   ba::placeholders::error,
-								   ba::placeholders::bytes_transferred));
-		} else { // analyze headers
-			std::string::size_type idx=fHeaders.find("\r\n");
-			std::string reqString=fHeaders.substr(0,idx);
-			fHeaders.erase(0,idx+2);
 
-			idx=reqString.find(" ");
-			if(idx == std::string::npos) {
-				std::cout << "Bad first line: " << reqString << std::endl;
-				return;
-			}
-			
-			fMethod=reqString.substr(0,idx);
-			reqString=reqString.substr(idx+1);
-			idx=reqString.find(" ");
-			if(idx == std::string::npos) {
-				std::cout << "Bad first line of request: " << reqString << std::endl;
-				return;
-			}
-			fURL=reqString.substr(0,idx);
-			fReqVersion=reqString.substr(idx+1);
-			idx=fReqVersion.find("/");
-			if(idx == std::string::npos) {
-				std::cout << "Bad first line of request: " << reqString << std::endl;
-				return;
-			}
-			fReqVersion=fReqVersion.substr(idx+1);
-			
-			// analyze headers, etc
-			ParseHeaders(fHeaders,reqHeaders);
-			// pass control
-			StartConnect();
-		}
-	} else {
-		Shutdown();
-	}
-#endif
-
+void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t len) 
+{
 	if (!err && !IsStopped())
 	{
 		BufferType::iterator dataEnd_ = bbuffer.begin();
@@ -267,7 +199,7 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 					ReadMoreFromBrowser(Headers);
 					break;
 				}
-				// more data "possibly!" exists in browser buffer, no need to break here
+				// TODO: more data "possibly!" exists in browser buffer, no need to break here (e.g. request that has body!)
 
 			default:
 				break;
@@ -279,8 +211,10 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 	}
 }
 
+
 void HttpConnection::ReadMoreFromBrowser(ClientRequestState state)
 {
+	state; // unreferenced
 	ba::async_read(bsocket_, ba::buffer(bbuffer), ba::transfer_at_least(1),
 			   boost::bind(&HttpConnection::HandleBrowserReadHeaders,
 			   shared_from_this(),
@@ -288,89 +222,220 @@ void HttpConnection::ReadMoreFromBrowser(ClientRequestState state)
 						   ba::placeholders::bytes_transferred));
 }
 
-/** 
- * 
- * 
- * @param err 
- * @param len 
- */
-void HttpConnection::HandleServerWrite(const bs::error_code& err, size_t len) {
-	if(!err && !IsStopped()) {
-#if 0
-		ba::async_read(ssocket_, ba::buffer(sbuffer), ba::transfer_at_least(1),
-				   boost::bind(&HttpConnection::HandleServerReadHeaders,
-							   /*shared_from_this()*/ shared_from_this(),
-							   ba::placeholders::error,
-							   ba::placeholders::bytes_transferred));
-#endif
-		auto serverResp = HttpServerResponseConnection::Create(io_service_, ssocket_, bsocket_, this->lifeMng_);
-		serverResp->StartReadingFromServer();
+// at this point all client request data is known such that connection to origin server is possible
+void HttpConnection::StartConnect() 
+{
+	std::string uri(this->message_.Destination().begin(), this->message_.Destination().end());
+	std::string host;
+	std::string port;
 
-	}else {
+	if (!ParseUri(uri, host, port))
+        throw std::exception("Invalid URI");
+        //TODO: retun an error to client;
+
+	if(!isOpened) 
+	{
+		fServer=host;
+		fPort=port;
+		ba::ip::tcp::resolver::query query(host, port);
+		resolver_.async_resolve(query,
+								boost::bind(&HttpConnection::HandleResolve, shared_from_this(),
+											boost::asio::placeholders::error,
+											boost::asio::placeholders::iterator));
+	}
+	else 
+	{
+	    StartWriteToServer();
+	}
+}
+
+// origin server resolving of ip address
+void HttpConnection::HandleResolve(const boost::system::error_code& err,
+								ba::ip::tcp::resolver::iterator endpoint_iterator) {
+    if (!err) 
+	{
+		ba::ip::tcp::endpoint endpoint = *endpoint_iterator;
+		ssocket_.async_connect(endpoint,
+							  boost::bind(&HttpConnection::HandleConnect, shared_from_this(),
+										  boost::asio::placeholders::error,
+										  ++endpoint_iterator));
+    }
+	else 
+	{
+        FILE_LOG(logERROR) << "HttpConnection::HandleResolve failed: " << err.message();
+		Shutdown();
+	}
+}
+
+// connection with origin server might have succeded, if not try connecting with the next endpoint available
+void HttpConnection::HandleConnect(const boost::system::error_code& err,
+								ba::ip::tcp::resolver::iterator endpoint_iterator) 
+{
+    if (!err) 
+	{
+		isOpened=true;
+		StartWriteToServer();
+    } else if (endpoint_iterator != ba::ip::tcp::resolver::iterator()) 
+	{
+		ssocket_.close();
+		ba::ip::tcp::endpoint endpoint = *endpoint_iterator;
+		ssocket_.async_connect(endpoint,
+							   boost::bind(&HttpConnection::HandleConnect, shared_from_this(),
+										   boost::asio::placeholders::error,
+										   ++endpoint_iterator));
+    }
+	else
+	{
+        FILE_LOG(logERROR) << "HttpConnection::HandleConnect failed: " << err.message();
+		Shutdown();
+	}
+}
+
+void HttpConnection::StartWriteToServer() 
+{
+	fReq=std::string(this->message_.Method().begin(), this->message_.Method().end());
+	fReq+=" ";
+	fReq+=std::string(this->message_.Destination().begin(), this->message_.Destination().end());
+	fReq+=" HTTP/";
+	fReq+="1.0";
+	fReq+="\r\n";
+
+	fReq += std::string(this->reqHeaders_.begin(), this->reqHeaders_.end());
+    FILE_LOG(logDEBUG) << "HttpConnection::StartWriteToServer: " << fReq;
+
+	ba::async_write(ssocket_, ba::buffer(fReq),
+					boost::bind(&HttpConnection::HandleServerWrite, shared_from_this(),
+								ba::placeholders::error,
+								ba::placeholders::bytes_transferred));
+}
+
+
+void HttpConnection::HandleServerWrite(const bs::error_code& err, size_t len)
+{
+	len; // unreferenced. TODO: do we care ?
+	if(!err && !IsStopped()) 
+	{
+		ba::async_read(ssocket_, ba::buffer(sbuffer), ba::transfer_at_least(1),
+			boost::bind(&HttpConnection::HandleServerRead,
+						shared_from_this(),
+						ba::placeholders::error,
+						ba::placeholders::bytes_transferred));
+		newServerReadStart_ = sbuffer.begin();
+	}
+	else 
+	{
         FILE_LOG(logERROR) << "HttpConnection::HandleServerWrite failed: " << err.message();
 		Shutdown();
 	}
 }
 
+void HttpConnection::HandleServerRead(const bs::error_code& err, size_t len)
+{
+	if (!err && !IsStopped())
+	{
+		BufferType::iterator dataEnd = sbuffer.begin();
+		std::advance(dataEnd, len);
+		network::ResponseParser::Result parseResult = network::ResponseParser::Indeterminate;
+
+		std::pair<char*, char*> resultRange;
+		switch (serverResponseState_)
+		{
+			case ReadUntilBody: // read all server response untill beginning of data
+				resultRange = responseParser_.ParseUntil(network::ResponseParser::HttpHeadersDone, std::make_pair(newServerReadStart_, dataEnd), parseResult);
+				if (parseResult == network::ResponseParser::ParsedFailed)
+				{
+					//std::cout << "Error processing Method" << std::endl;
+                    FILE_LOG(logERROR) << "Error processing ReadUntilBody";
+					break;
+				}
+				else if (parseResult == network::ResponseParser::ParsedOK) // read all ReadUntilBody data succefully
+				{
+					std::copy(resultRange.first, resultRange.second, std::back_inserter(partialParsedServer_)); //append to partial result
+					//TODO: trim method
+					this->newServerReadStart_ = resultRange.second; // from here continue parsing with other data that exists in browser buffer
+					this->partialParsedServer_.clear(); // use it only for one element
+
+					// is there any more that in buffer that can be processed?
+					if (resultRange.second == dataEnd)
+					{
+						serverResponseState_ = Body;
+						//ReadMoreFromServer(Body);
+						SendDataToClient(len);
+						break;
+					}
+				}
+				else //partial parsed
+				{
+					std::copy(resultRange.first, resultRange.second, std::back_inserter(partialParsedServer_)); //append to partial result
+					serverResponseState_ = ReadUntilBody;
+					//ReadMoreFromServer(ReadUntilBody);
+					SendDataToClient(len);
+					break;
+				}
+			case Body: // read all server body response
+				// TODO: we asume here that body ends when server closes the connection. Have to make it work eith Content-Length and chuncked transfer
+				SendDataToClient(len);
+				break;
+			default: // we should not get here
+				break;
+		}
+	}
+	else
+	{
+		Shutdown();
+	}
+}
+
+void HttpConnection::SendDataToClient(int len)
+{
+	ba::async_write(bsocket_, ba::buffer(sbuffer, len),
+					boost::bind(&HttpConnection::HandleClientWrite, shared_from_this(),
+								ba::placeholders::error,
+								ba::placeholders::bytes_transferred));
+}
+
+
+void HttpConnection::HandleClientWrite(const bs::error_code& err, size_t len)
+{
+	len ; // unreferenced
+	if (!err && !IsStopped())
+	{
+		ReadMoreFromServer(serverResponseState_);
+	}
+	else
+	{
+		Shutdown();
+	}
+}
+
+void HttpConnection::ReadMoreFromServer(ServerResponseState state)
+{
+	state; // unreferenced
+	ba::async_read(ssocket_, ba::buffer(sbuffer), ba::transfer_at_least(1),
+			boost::bind(&HttpConnection::HandleServerRead,
+						shared_from_this(),
+						ba::placeholders::error,
+						ba::placeholders::bytes_transferred));
+	newServerReadStart_ = bbuffer.begin();
+}
+
+//TODO: below should be deleted
 /** 
  * 
  * 
  * @param err 
  * @param len 
  */
-void HttpConnection::HandleServerReadHeaders(const bs::error_code& err, size_t len) {
-	if(!err) {
-#if 0
-		std::string::size_type idx;
-		if(fHeaders.empty())
-			fHeaders=std::string(sbuffer.data(),len);
-		else
-			fHeaders+=std::string(sbuffer.data(),len);
-		idx=fHeaders.find("\r\n\r\n");
-		if(idx == std::string::npos) { // going to read rest of headers
-			ba::async_read(ssocket_, ba::buffer(sbuffer), ba::transfer_at_least(1),
-					   boost::bind(&HttpConnection::HandleBrowserReadHeaders,
-								   shared_from_this(),
-								   ba::placeholders::error,
-								   ba::placeholders::bytes_transferred));
-		} else { // analyze headers
-            FILE_LOG(logDEBUG) << "HttpConnection::HandleServerReadHeaders: " << fHeaders;
-
-			RespReaded=len-idx-4;
-			idx=fHeaders.find("\r\n");
- 			std::string respString=fHeaders.substr(0,idx);
-			RespLen = -1;
-			ParseHeaders(fHeaders.substr(idx+2),respHeaders);
-			std::string reqConnString="",respConnString="";
-
-			std::string respVersion=respString.substr(respString.find("HTTP/")+5,3);
-			
-			HeadersMap::iterator it=respHeaders.find("Content-Length");
-			if(it != respHeaders.end())
-				RespLen=boost::lexical_cast<int>(it->second);
-			it=respHeaders.find("Connection");
-			if(it != respHeaders.end())
-				respConnString=it->second;
-			it=reqHeaders.find("Connection");
-			if(it != reqHeaders.end())
-				reqConnString=it->second;
-			
-			isPersistent=(
-				((fReqVersion == "1.1" && reqConnString != "close") ||
-				 (fReqVersion == "1.0" && reqConnString == "keep-alive")) &&
-				((respVersion == "1.1" && respConnString != "close") ||
-				 (respVersion == "1.0" && respConnString == "keep-alive")) &&
-				RespLen != -1);
-			// send data
-			ba::async_write(bsocket_, ba::buffer(fHeaders),
-							boost::bind(&HttpConnection::HandleBrowserWrite,
-										shared_from_this(),
-										ba::placeholders::error,
-										ba::placeholders::bytes_transferred));
-#endif
-			auto serverResp = HttpServerResponseConnection::Create(io_service_, ssocket_, bsocket_, this->lifeMng_);
-			serverResp->StartReadingFromServer();
-	} else {
+void HttpConnection::HandleServerReadHeaders(const bs::error_code& err, size_t len) 
+{
+	len ; // unreferenced TODO: do we care ?
+	if(!err) 
+	{
+		//auto serverResp = HttpServerResponseConnection::Create(io_service_, ssocket_, bsocket_, this->lifeMng_);
+		//serverResp->StartReadingFromServer();
+	} 
+	else 
+	{
         FILE_LOG(logERROR) << "HttpConnection::HandleServerReadHeaders error: " << err.message();
 		Shutdown();
 	}
@@ -431,7 +496,7 @@ void HttpConnection::Shutdown() {
 		//ssocket_.close();
 		//bsocket_.close();
 		isShuttingDown_ = true;
-		this->lifeMng_->Shutdown();
+		this->parrentConn_.Shutdown();
 	}
 }
 
@@ -439,131 +504,4 @@ bool HttpConnection::IsStopped()
 {
 	//return (!ssocket_.is_open() || !bsocket_.is_open());
 	return isShuttingDown_;
-}
-/** 
- * 
- * 
- */
-void HttpConnection::StartConnect() {
-	std::string uri(this->message_.Destination().begin(), this->message_.Destination().end());
-	std::string host;
-	std::string port;
-
-	if (!ParseUri(uri, host, port))
-        throw std::exception("Invaid URI");
-        //TODO: retun an error to client;
-
-	if(!isOpened /*|| server != fServer || port != fPort*/) {
-		fServer=host;
-		fPort=port;
-		ba::ip::tcp::resolver::query query(host, port);
-		resolver_.async_resolve(query,
-								boost::bind(&HttpConnection::HandleResolve, shared_from_this(),
-											boost::asio::placeholders::error,
-											boost::asio::placeholders::iterator));
-	} else {
-	    StartWriteToServer();
-	}
-}
-
-/** 
- * 
- * 
- */
-void HttpConnection::StartWriteToServer() {
-	fReq=std::string(this->message_.Method().begin(), this->message_.Method().end());
-	fReq+=" ";
-	fReq+=std::string(this->message_.Destination().begin(), this->message_.Destination().end());
-	fReq+=" HTTP/";
-	fReq+="1.0";
-	fReq+="\r\n";
-
-	fReq += std::string(this->reqHeaders_.begin(), this->reqHeaders_.end());
-    FILE_LOG(logDEBUG) << "HttpConnection::StartWriteToServer: " << fReq;
-
-	ba::async_write(ssocket_, ba::buffer(fReq),
-					boost::bind(&HttpConnection::HandleServerWrite, shared_from_this(),
-								ba::placeholders::error,
-								ba::placeholders::bytes_transferred));
-
-	fHeaders.clear();
-}
-
-
-/** 
- * 
- * 
- * @param err 
- * @param endpoint_iterator 
- */
-void HttpConnection::HandleResolve(const boost::system::error_code& err,
-								ba::ip::tcp::resolver::iterator endpoint_iterator) {
-    if (!err) {
-		ba::ip::tcp::endpoint endpoint = *endpoint_iterator;
-		ssocket_.async_connect(endpoint,
-							  boost::bind(&HttpConnection::HandleConnect, shared_from_this(),
-										  boost::asio::placeholders::error,
-										  ++endpoint_iterator));
-    }else {
-        FILE_LOG(logERROR) << "HttpConnection::HandleResolve failed: " << err.message();
-		Shutdown();
-	}
-}
-
-/** 
- * 
- * 
- * @param err 
- * @param endpoint_iterator 
- */
-void HttpConnection::HandleConnect(const boost::system::error_code& err,
-								ba::ip::tcp::resolver::iterator endpoint_iterator) {
-    if (!err) {
-		isOpened=true;
-		StartWriteToServer();
-    } else if (endpoint_iterator != ba::ip::tcp::resolver::iterator()) {
-		ssocket_.close();
-		ba::ip::tcp::endpoint endpoint = *endpoint_iterator;
-		ssocket_.async_connect(endpoint,
-							   boost::bind(&HttpConnection::HandleConnect, shared_from_this(),
-										   boost::asio::placeholders::error,
-										   ++endpoint_iterator));
-    } else {
-        FILE_LOG(logERROR) << "HttpConnection::HandleConnect failed: " << err.message();
-		Shutdown();
-	}
-}
-
-void HttpConnection::ParseHeaders(const std::string& h, HeadersMap& hm) {
-	std::string str(h);
-	std::string::size_type idx;
-	std::string t;
-    bool badHeaderFormat = false;
-
-	while((idx=str.find("\r\n")) != std::string::npos) {
-        badHeaderFormat = false;
-		t=str.substr(0,idx);
-		str.erase(0,idx+2);
-		if(t == "")
-			break;
-		idx=t.find(": ");
-		if(idx == std::string::npos) {
-			//std::cout << "Bad header line, trying with other format now: " << t << std::endl;
-            FILE_LOG(logERROR) << "Bad header line, trying with other format now: ";
-			//break;
-            badHeaderFormat = true;
-            idx=t.find(":");
-            if (idx == std::string::npos)
-            {
-                //std::cout << "Bad header line, giving up now: " << t << std::endl;
-                FILE_LOG(logERROR) << "Bad header line, giving up now: ";
-                break;
-            }
-		}
-
-        if (!badHeaderFormat)
-		    hm.insert(std::make_pair(t.substr(0,idx),t.substr(idx+2)));
-        else
-            hm.insert(std::make_pair(t.substr(0,idx),t.substr(idx+1)));
-	}
 }

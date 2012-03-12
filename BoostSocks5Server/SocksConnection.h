@@ -36,6 +36,9 @@ private:
     //ba::ip::tcp::socket& remoteSocket_;
 };
 
+#pragma warning ( push )
+#pragma warning ( disable : 4512 ) //'ProxySocksSession' : assignment operator could not be generated
+
 class ProxySocksSession: public boost::enable_shared_from_this<ProxySocksSession>
 {
 public:
@@ -73,3 +76,4 @@ private:
   char dataRemote_[max_length];
   char dataRemoteCopy_[max_length];
 };
+#pragma warning ( pop )

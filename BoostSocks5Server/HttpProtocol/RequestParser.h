@@ -64,7 +64,7 @@ namespace network
 		//typedef std::pair<std::>
 
 		template <class Iterator>
-		std::pair<Iterator, Iterator> ParseUntil(StateType stopState, std::pair<Iterator, Iterator>& range, Result& result)
+		std::pair<Iterator, Iterator> ParseUntil(StateType stopState, const std::pair<Iterator, Iterator>& range, Result& result)
 		{
 			bool parsedOK = true; // mesage structure is OK
 			bool parsedComplete = false; // range contains data that matched completely the stopState criterion;

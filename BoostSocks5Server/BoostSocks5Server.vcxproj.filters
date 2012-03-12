@@ -72,9 +72,6 @@
     <ClInclude Include="HttpProtocol\ResponseParser.h">
       <Filter>HttpProtocol</Filter>
     </ClInclude>
-    <ClInclude Include="HttpProtocol\HttpServerResponseConnection.h">
-      <Filter>HttpProtocol</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -96,9 +93,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SocksBindingServer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="HttpProtocol\HttpServerResponseConnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

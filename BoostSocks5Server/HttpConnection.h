@@ -4,6 +4,7 @@
 #include <map>
 #include "message.h"
 #include "RequestParser.h"
+#include "ResponseParser.h"
 #include "connection.h"
 
 //FWD
@@ -17,29 +18,23 @@ public:
 		return Pointer(new HttpConnection(io_service,  bsocket, firstByte, parrentConn));
 	}
 
+	HttpConnection(ba::io_service& io_service, ba::ip::tcp::socket& bsocket, char firstByte, Connection& parrentConn);
+	void Start();
+
 	ba::ip::tcp::socket& Socket() {
 		return bsocket_;
 	}
 
-	void Start();
-
-//private:
 public:
-	HttpConnection(ba::io_service& io_service, ba::ip::tcp::socket& bsocket, char firstByte, Connection& parrentConn);
-	void HandleBrowserWrite(const bs::error_code& err, size_t len);
-	void HandleBrowserReadHeaders(const bs::error_code& err, size_t len);
 
-	void HandleServerWrite(const bs::error_code& err, size_t len);
+	//TODO: remove me
 	void HandleServerReadHeaders(const bs::error_code& err, size_t len);
 	void HandleServerReadBody(const bs::error_code& err, size_t len);
-	void StartConnect();
-	void StartWriteToServer();
+	void HandleBrowserWrite(const bs::error_code& err, size_t len);
+
 	void Shutdown();
 	bool IsStopped();
-	void HandleResolve(const boost::system::error_code& err,
-									ba::ip::tcp::resolver::iterator endpoint_iterator);
-	void HandleConnect(const boost::system::error_code& err,
-									ba::ip::tcp::resolver::iterator endpoint_iterator);
+
 private:
 	enum ClientRequestState
 	{
@@ -49,7 +44,27 @@ private:
 		Headers
 	};
 
+	enum ServerResponseState
+	{
+		ReadUntilBody,
+		Body
+	};
+
+private:
+	void HandleBrowserReadHeaders(const bs::error_code& err, size_t len);
 	void ReadMoreFromBrowser(ClientRequestState state);
+	void StartConnect();
+	void HandleResolve(const boost::system::error_code& err,
+								ba::ip::tcp::resolver::iterator endpoint_iterator);
+	void HandleConnect(const boost::system::error_code& err,
+								ba::ip::tcp::resolver::iterator endpoint_iterator);
+	void StartWriteToServer();
+	void HandleServerWrite(const bs::error_code& err, size_t len);
+	// read from server related methods
+	void HandleServerRead(const bs::error_code& err, size_t len);
+	void SendDataToClient(int len);
+	void HandleClientWrite(const bs::error_code& err, size_t len);
+	void ReadMoreFromServer(ServerResponseState state);
 
 private:
 	ba::io_service& io_service_;
@@ -63,7 +78,6 @@ private:
 	int32_t RespLen;
 	int32_t RespReaded;
 
-	std::string fHeaders;
 	std::string fNewURL;
 	std::string fMethod;
 	std::string fReqVersion;
@@ -81,27 +95,29 @@ private:
 	typedef std::map<std::string,std::string> HeadersMap;
 
 
-	HeadersMap reqHeaders, respHeaders;
+	HeadersMap reqHeaders;
 	DataType reqHeaders_;
-
-	
-	void ParseHeaders(const std::string& h, HeadersMap& hm);
 
 	BufferType bbuffer;
 	BufferType sbuffer;
 	DataType partialParsed_;
-	BufferType::iterator newStart_, dataEnd_;
+	DataType partialParsedServer_;
+	BufferType::iterator newStart_;//, dataEnd_;
+	BufferType::iterator newServerReadStart_;//, serverDataEnd_;
 
 private:
 
 	ClientRequestState clientRequestState_;
+	ServerResponseState serverResponseState_;
+
 	network::RequestParser parser_;
+	network::ResponseParser responseParser_;
 	network::BasicMessage message_;
 	bool isShuttingDown_;
 	std::shared_ptr<HttpConnectionLifeManagement> lifeMng_;
 
 };
-
+/*
 class HttpConnectionLifeManagement
 {
 public:
@@ -116,8 +132,10 @@ public:
 	}
 
 private:
+	HttpConnectionLifeManagement& operator = (const HttpConnectionLifeManagement& );
+private:
 	Connection& parrentConn_;
 	bool isShuttingDown_;
-};
+};*/
 
 

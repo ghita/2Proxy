@@ -7,7 +7,7 @@
 #include "Connection.h"
 
 
-Server::Server(ba::io_service& ioService, int port): ioService_(ioService), port_(port), acceptor_(ioService_, ba::ip::tcp::endpoint(ba::ip::tcp::v4(), port_))
+Server::Server(ba::io_service& ioService, unsigned short port): ioService_(ioService), port_(port), acceptor_(ioService_, ba::ip::tcp::endpoint(ba::ip::tcp::v4(), port_))
 {
 	StartAccept();
 }

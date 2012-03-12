@@ -46,7 +46,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>c:\Program Files\boost\boost_1_47\;.\HttpProtocol;.\Log</AdditionalIncludeDirectories>
@@ -86,7 +86,6 @@
     <ClInclude Include="HttpProtocol\message.h" />
     <ClInclude Include="HttpProtocol\RequestParser.h" />
     <ClInclude Include="HttpProtocol\ResponseParser.h" />
-    <ClInclude Include="HttpProtocol\HttpServerResponseConnection.h" />
     <ClInclude Include="Log\Log.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="socks4.h" />
@@ -101,7 +100,6 @@
     <ClCompile Include="BoostSocks5Server.cpp" />
     <ClCompile Include="Connection.cpp" />
     <ClCompile Include="HttpConnection.cpp" />
-    <ClCompile Include="HttpProtocol\HttpServerResponseConnection.cpp" />
     <ClCompile Include="server.cpp" />
     <ClCompile Include="SocksBindingServer.cpp" />
     <ClCompile Include="SocksConnection.cpp" />

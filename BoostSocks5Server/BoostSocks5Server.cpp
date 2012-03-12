@@ -7,6 +7,8 @@
 
 int main(int argc, _TCHAR* argv[])
 {
+	argv;
+	argc;
     //FILELog::ReportingLevel() = logDEBUG;
     //FILE_LOG(logINFO) << "Started logging";
     boost::asio::io_service io_service;

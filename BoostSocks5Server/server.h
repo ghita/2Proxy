@@ -7,7 +7,7 @@ class Server
 {
 public:
 
-	Server(ba::io_service& ioService, int port);
+	Server(ba::io_service& ioService, unsigned short port);
 
 private:
 	void StartAccept();
@@ -15,6 +15,6 @@ private:
 
 private:
 	ba::io_service& ioService_;
-	int port_;
+	unsigned short port_;
 	ba::ip::tcp::acceptor acceptor_;
 };
