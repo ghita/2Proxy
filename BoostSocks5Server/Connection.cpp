@@ -65,7 +65,7 @@ void Connection::Start()
         else // asume we have http
         {
 		    char firstByte = 0;
-			httpConnection_ = HttpConnection::Create(ioService_, bsocket_, firstByte);
+			httpConnection_ = HttpConnection::Create(ioService_, bsocket_, firstByte, *this);
 			httpConnection_->Start();
         }
     }

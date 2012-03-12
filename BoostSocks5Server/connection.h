@@ -1,5 +1,5 @@
-#include "stdafx.h"
 #pragma once
+#include "stdafx.h"
 
 //FWD
 #include "SocksConnection.h"

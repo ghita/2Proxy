@@ -5,8 +5,9 @@
 #include <boost/lexical_cast.hpp>
 
 #include "HttpUtil.h"
+#include "HttpServerResponseConnection.h"
 
-HttpConnection::HttpConnection(ba::io_service& io_service, ba::ip::tcp::socket& bsocket, char firstByte) : io_service_(io_service),
+HttpConnection::HttpConnection(ba::io_service& io_service, ba::ip::tcp::socket& bsocket, char firstByte, Connection& parrentConn) : io_service_(io_service),
 													 bsocket_(bsocket),
 													 ssocket_(io_service),
 													 firstByte_(firstByte),
@@ -15,8 +16,10 @@ HttpConnection::HttpConnection(ba::io_service& io_service, ba::ip::tcp::socket& 
 													 isPersistent(false),
 													 isOpened(false),
                                                      isFirstByteAdded(false),
-													 clientRequestState_(Method)	{
-}
+													 clientRequestState_(Method),
+													 parrentConn_(parrentConn),
+													 isShuttingDown_(false),
+													 lifeMng_(new HttpConnectionLifeManagement(parrentConn_)) {}
 
 /** 
  * 
@@ -100,7 +103,7 @@ void HttpConnection::HandleBrowserReadHeaders(const bs::error_code& err, size_t 
 	}
 #endif
 
-	if (!err)
+	if (!err && !IsStopped())
 	{
 		BufferType::iterator dataEnd_ = bbuffer.begin();
 		std::advance(dataEnd_, len);
@@ -292,12 +295,17 @@ void HttpConnection::ReadMoreFromBrowser(ClientRequestState state)
  * @param len 
  */
 void HttpConnection::HandleServerWrite(const bs::error_code& err, size_t len) {
-	if(!err) {
+	if(!err && !IsStopped()) {
+#if 0
 		ba::async_read(ssocket_, ba::buffer(sbuffer), ba::transfer_at_least(1),
 				   boost::bind(&HttpConnection::HandleServerReadHeaders,
 							   /*shared_from_this()*/ shared_from_this(),
 							   ba::placeholders::error,
 							   ba::placeholders::bytes_transferred));
+#endif
+		auto serverResp = HttpServerResponseConnection::Create(io_service_, ssocket_, bsocket_, this->lifeMng_);
+		serverResp->StartReadingFromServer();
+
 	}else {
         FILE_LOG(logERROR) << "HttpConnection::HandleServerWrite failed: " << err.message();
 		Shutdown();
@@ -312,6 +320,7 @@ void HttpConnection::HandleServerWrite(const bs::error_code& err, size_t len) {
  */
 void HttpConnection::HandleServerReadHeaders(const bs::error_code& err, size_t len) {
 	if(!err) {
+#if 0
 		std::string::size_type idx;
 		if(fHeaders.empty())
 			fHeaders=std::string(sbuffer.data(),len);
@@ -358,7 +367,9 @@ void HttpConnection::HandleServerReadHeaders(const bs::error_code& err, size_t l
 										shared_from_this(),
 										ba::placeholders::error,
 										ba::placeholders::bytes_transferred));
-		}
+#endif
+			auto serverResp = HttpServerResponseConnection::Create(io_service_, ssocket_, bsocket_, this->lifeMng_);
+			serverResp->StartReadingFromServer();
 	} else {
         FILE_LOG(logERROR) << "HttpConnection::HandleServerReadHeaders error: " << err.message();
 		Shutdown();
@@ -415,10 +426,20 @@ void HttpConnection::HandleBrowserWrite(const bs::error_code& err, size_t len) {
 }
 
 void HttpConnection::Shutdown() {
-	ssocket_.close();
-	bsocket_.close();
+	if (!isShuttingDown_)
+	{
+		//ssocket_.close();
+		//bsocket_.close();
+		isShuttingDown_ = true;
+		this->lifeMng_->Shutdown();
+	}
 }
 
+bool HttpConnection::IsStopped()
+{
+	//return (!ssocket_.is_open() || !bsocket_.is_open());
+	return isShuttingDown_;
+}
 /** 
  * 
  * 
